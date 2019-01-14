@@ -1,4 +1,4 @@
-[![Maven Central](https://img.shields.io/maven-central/v/org.broadinstitute/gatk.svg)](https://maven-badges.herokuapp.com/maven-central/org.broadinstitute/gatk)[![License (3-Clause BSD)](https://img.shields.io/badge/license-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)[![IBM Power9 Download]()](https://ibm.box.com/v/gatk4-power)
+[![Maven Central](https://img.shields.io/maven-central/v/org.broadinstitute/gatk.svg)](https://maven-badges.herokuapp.com/maven-central/org.broadinstitute/gatk)[![License (3-Clause BSD)](https://img.shields.io/badge/license-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)[![IBM Power9 Download](https://img.shields.io/badge/power9-download-blue.svg)](https://ibm.box.com/v/gatk4-power)
 # GATK4-Power 
 Supporting GATK4 on IBM Power architecture, including enablement, performance tuning and optimization.
 
