@@ -1,0 +1,182 @@
+#!/bin/bash
+
+#
+# Power9 tests - WGS pipeline
+################################
+
+export PATH=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/bin:$PATH
+export GATK_LOCAL_JAR=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.0.11.0/libs/gatk.jar
+export GATK_SPARK_JAR=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.0.11.0/libs/gatk-spark.jar
+export LD_LIBRARY_PATH=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.0.11.0/libs:$LD_LIBRARY_PATH
+
+workPath=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/NA12878/tmp
+vcfFile=${workPath}/NA12878_merged.vcf
+
+ref=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/Ref/Homo_sapiens_assembly38.fasta
+
+knownSites=(/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/Ref/dbsnp_146.hg38.vcf.gz
+           /gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/Ref/Homo_sapiens_assembly38.known_indels.vcf.gz
+           /gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/Ref/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz)
+
+vcfHapmap=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/Ref/hapmap_3.3.hg38.vcf.gz
+vcfOmni=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/Ref/1000G_omni2.5.hg38.vcf.gz
+vcfGlk=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/Ref/1000G_phase1.snps.high_confidence.hg38.vcf
+vcfMills=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/Ref/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz
+vcfDbsnp=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/Ref/dbsnp_138.hg38.vcf.gz
+
+cd $workPath
+
+# BWA MEM MAPPING and SAMTOOLS SORTING ############
+
+input1=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/NA12878/input/NA12878_R1.fastq.gz
+input2=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/NA12878/input/NA12878_R2.fastq.gz
+output=$workPath/NA12878_hg38.bwa.bam
+
+/usr/bin/time -v -o time_bwa.log taskset -c 0-159:4 bwa mem -t 40 -Ma \
+     -R '@RG\tID:sample_lane\tSM:sample\tPL:illumina\tLB:sample\tPU:lane' \
+     $ref $input1 $input2 | samtools view -bS - -@ 20 | samtools sort - -@ 20 -n -m 8G -T $input1 -o $output
+
+# Markduplicates using Samtools ############
+#running mark duplicates with samtools
+
+input=$workPath/NA12878_hg38.bwa.bam
+output=$workPath/NA12878_hg38.md.bam
+
+/usr/bin/time -v -o time_Fixmate_mk.log taskset -c 0-159:4 samtools fixmate -m -@ 40 $input fixmate.bam
+/usr/bin/time -v -o time_Sort_mk.log samtools sort -@ 40 -m 8G -o sorted.bam fixmate.bam
+/usr/bin/time -v -o time_Markduplicates.log taskset -c 0-159:4 samtools markdup -s -@ 40 sorted.bam $output
+
+rm -fr fixmate.bam sorted.bam
+#create index ## Maybe no need to index
+samtools index -@ 40 $output
+
+#Setup knownSites
+for i in ${!knownSites[*]}
+  do
+    if [ $i == 0 ]
+    then
+      knownSiteArg="--known-sites ${knownSites[i]}"
+    else
+      knownSiteArg="${knownSiteArg} --known-sites ${knownSites[i]}"
+    fi
+done
+	
+# BASE QUALITY SCORE RECALIBRATION ##########
+input=$workPath/NA12878_hg38.md.bam
+outfile=$workPath/NA12878_hg38.md.bam.br.table
+/usr/bin/time -v -o time_gatkBaseRecalibrator.log taskset -c 0-159:4 gatk --java-options "-Xmx8G -XX:+UseParallelGC -XX:ParallelGCThreads=20" \
+         BaseRecalibratorSpark \
+         -R $ref -I $input $knownSiteArg -O $outfile \
+         -- --spark-runner LOCAL --spark-master local[40] --conf spark.local.dir=$workPath
+
+bqfile=$workPath/NA12878_hg38.md.bam.br.table
+output=$workPath/NA12878_hg38.br.recal.bam
+/usr/bin/time -v -o time_gatkApplyBQSR.log taskset -c 0-159:4 gatk \
+       --java-options "-Xmx8G -XX:+UseParallelGC -XX:ParallelGCThreads=4" ApplyBQSRSpark -R $ref -I $input \
+       -bqsr $bqfile \
+       --static-quantized-quals 10 --static-quantized-quals 20 --static-quantized-quals 30 -O $output \
+       -- --spark-runner LOCAL --spark-master local[40] --conf spark.local.dir=$workPath
+         
+samtools index -@ 40 $output
+
+# VARIANT CALLING optimized for 36 cores Power9 ##########
+# Used Onle native pairhmm  # Run Haplotypecaller with split bam file
+chr=0
+chr2=15
+infile=$workPath/NA12878_hg38.br.recal.bam
+for i in `seq 1 22`
+do
+outfile=$workPath/NA12878_hg38.br.recal_$i.g.vcf
+if [ $i -lt 6 ]
+then
+/usr/bin/time -v -o time_gatkHaplotypeCaller_$i.log taskset -c $chr-$chr2 gatk \
+      --java-options "-Xmx4G -Djava.library.path=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.0.11.0/libs" HaplotypeCaller \
+      -R ${ref} -I $infile -L chr$i \
+      --native-pair-hmm-threads 16 --smith-waterman FASTEST_AVAILABLE \
+      -O $outfile -ERC GVCF -stand-call-conf 10 &
+   if [ $i -lt 5 ]
+   then
+      chr=$(($chr+16))
+      chr2=$(($chr2+16))
+   else
+      chr=$(($chr+16))
+      chr2=$(($chr2+4))
+   fi
+else
+/usr/bin/time -v -o time_gatkHaplotypeCaller_$i.log taskset -c $chr-$chr2 gatk \
+      --java-options "-Xmx4G -Djava.library.path=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.0.11.0/libs" HaplotypeCaller \
+      -R ${ref} -I $infile -L chr$i \
+      --native-pair-hmm-threads 4 --smith-waterman FASTEST_AVAILABLE \
+      -O $outfile -ERC GVCF -stand-call-conf 10 &
+   chr=$(($chr+4))
+   chr2=$(($chr2+4))
+fi
+done
+for i in X Y M
+do
+outfile=$workPath/NA12878_hg38.br.recal_$i.g.vcf
+/usr/bin/time -v -o time_gatkHaplotypeCaller_$i.log taskset -c $chr-$chr2 gatk \
+      --java-options "-Xmx4G -Djava.library.path=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.0.11.0/libs" HaplotypeCaller \
+      -R ${ref} -I $infile -L chr$i \
+      --native-pair-hmm-threads 4 --smith-waterman FASTEST_AVAILABLE \
+      -O $outfile -ERC GVCF -stand-call-conf 10 &
+    chr=$(($chr+4))
+    chr2=$(($chr2+4))
+done
+wait
+
+# combinge gvcf
+gvcfFiles=()
+for i in NA12878_hg38.br.recal_*.g.vcf
+do
+gvcfFiles[${#gvcfFiles[*]}]=$i
+done
+
+for i in ${!gvcfFiles[*]}
+do
+  if [ $i == 0 ]
+  then
+    gvcfFilesArg="--variant ${gvcfFiles[i]}"
+  else
+    gvcfFilesArg="${gvcfFilesArg} --variant ${gvcfFiles[i]}"
+  fi
+done
+
+/usr/bin/time -v -o time_gatkCombineGVCFs.log gatk --java-options "-Xmx4G" CombineGVCFs -R $ref $gvcfFilesArg -O ${vcfFile%vcf}g.vcf
+  
+# genotype gvcf files
+input=${vcfFile%vcf}g.vcf
+/usr/bin/time -v -o time_gatkGenotypeGVCFs.log gatk --java-options "-Xmx4G" GenotypeGVCFs -R $ref -V $input -O $vcfFile
+ 
+# VARIANT QUALITY SCORE RECALIBRATION (VQSR) ########
+/usr/bin/time -v -o time_gatkVariantRecalibratorSNP.log gatk --java-options "-Xmx4G" VariantRecalibrator \
+     -V $vcfFile -O ${workPath}/NA12878_recalibrate_SNP.recal \
+     -mode SNP --tranches-file ${workPath}/NA12878_recalibrate_SNP.tranches \
+     -tranche 100.0 -tranche 99.9 -tranche 99.0 -tranche 90.0 -an QD -an FS -an MQRankSum -an ReadPosRankSum -an SOR -an MQ \
+     --max-gaussians 6 \
+     -resource hapmap,known=false,training=true,truth=true,prior=15.0:$vcfHapmap \
+     -resource omni,known=false,training=true,truth=true,prior=12.0:$vcfOmni \
+     -resource 1000G,known=false,training=true,truth=false,prior=10.0:$vcfGlk \
+     -resource dbsnp,known=true,training=false,truth=false,prior=7.0:$vcfDbsnp
+  
+  # Apply recalibration to SNPs
+/usr/bin/time -v -o time_gatkApplyVQSRSNP.log gatk --java-options "-Xmx4G" ApplyVQSR \
+     -V $vcfFile -O ${workPath}/NA12878_recalibrated_snps_raw_indels.vcf \
+     --recal-file ${workPath}/NA12878_recalibrate_SNP.recal \
+     --tranches-file ${workPath}/NA12878_recalibrate_SNP.tranches \
+     -truth-sensitivity-filter-level 99.5 --create-output-variant-index true -mode SNP
+  
+  # Run Variant Recalibrator on Indels
+/usr/bin/time -v -o time_gatkVariantRecalibratorIndel.log gatk --java-options "-Xmx4G" VariantRecalibrator \
+     -V ${workPath}/NA12878_recalibrated_snps_raw_indels.vcf -O ${workPath}/NA12878_recalibrate_INDEL.recal \
+     -mode INDEL --tranches-file ${workPath}/NA12878_recalibrate_INDEL.tranches \
+     -tranche 100.0 -tranche 99.9 -tranche 99.0 -tranche 90.0 -an QD -an FS -an MQRankSum -an ReadPosRankSum -an SOR \
+     --max-gaussians 4 \
+     -resource mills,known=false,training=true,truth=true,prior=12.0:$vcfMills \
+     -resource dbsnp,known=true,training=false,truth=false,prior=2.0:$vcfDbsnp \
+       
+   # Apply recalibration to INDELs  
+/usr/bin/time -v -o time_gatkApplyVQSRIndel.log gatk --java-options "-Xmx4G" ApplyVQSR \
+    -V ${workPath}/NA12878_recalibrated_snps_raw_indels.vcf -O ${vcfFile%.vcf}.recal_snps_indels.vcf \
+    --recal-file ${workPath}/NA12878_recalibrate_INDEL.recal --tranches-file ${workPath}/NA12878_recalibrate_INDEL.tranches  \
+    -truth-sensitivity-filter-level 99.0 --create-output-variant-index true -mode INDEL
