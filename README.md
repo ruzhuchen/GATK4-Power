@@ -8,3 +8,5 @@ Supporting GATK4 on IBM Power architecture, including enablement, performance tu
 * 2. Benchmarking scripts to run GATK4 pipelines on IBM Power system
 
 Contact: Ruzhu Chen (ruzhuchen@us.ibm.com) for support
+
+* local push update
