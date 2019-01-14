@@ -8,15 +8,17 @@ This script is optimized for Power9 only.
    `ulimit -n 20480`
    `ulimit ps unlimited`
    
-## Setting PATH to $GATK_HOME/bin
+## Setting PATH to `$GATK_HOME/bin`
+   ```
    export GATK_HOME=your-path-to-this-directory
    export PATH=$GATK_HOME/bin:$PATH;
    export GATK_LOCAL_JAR=$GATK_HOME/gatk-4.0.11.0/libs/gatk.jar
    export GATK_SPARK_JAR=$GATK_HOME/gatk-4.0.11.0/libs/gatk-spark.jar
+   ```
 ## JAVA Options
-   --java-options "-Xmx4G" #increase as need! if running in Spark mode, use "-Xmx8G" and up
+   `--java-options "-Xmx4G"` #increase as need! if running in Spark mode, use `"-Xmx8G"` and up
 ## Using IBM native pairhmm library
-   --java-options "-Xmx4G -Djava.library.path=$GATK_HOME/libs"
+   `--java-options "-Xmx4G -Djava.library.path=$GATK_HOME/libs"`
    * For HaplotypeCaller, here is the example script:
    `/usr/bin/time -v -o time_gatkHaplotypeCaller.txt gatk --java-options "-Xmx4G -Djava.library.path=$GATK_HOME/libs" \
          HaplotypeCaller -R ${ref} -I your_dedup_recal.bam \
