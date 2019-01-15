@@ -9,4 +9,4 @@ Supporting GATK4 on IBM Power architecture, including enablement, performance tu
 
 Contact: Ruzhu Chen (ruzhuchen@us.ibm.com) for support
 
-* local push update
+* Note to user: The Power9 download is password protected. Please contact me for more info.
