@@ -1,18 +1,31 @@
 #!/bin/bash
-#
-# Power9 tests - WGS pipeline tp ApplyBQSR
+
+################################
+# Power9 tests - WGS pipeline for Power9 system
 ################################
 
-export PATH=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/bin:$PATH
-export GATK_LOCAL_JAR=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.0.11.0/libs/gatk.jar
-export GATK_SPARK_JAR=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.0.11.0/libs/gatk-spark.jar
-export LD_LIBRARY_PATH=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.0.11.0/libs:$LD_LIBRARY_PATH
+#Change this path for your test
+export GATK_HOME=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG
+export BMK_HOME=`pwd`
+export RF_HOME=`pwd`/Ref
 
-workPath=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/YX160000128/work
-ref=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/Ref/Homo_sapiens_assembly38.fasta
-knownSites=(/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/Ref/dbsnp_146.hg38.vcf.gz
-           /gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/Ref/Homo_sapiens_assembly38.known_indels.vcf.gz
-           /gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/Ref/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz)
+export PATH=$GATK_HOME/bin:$PATH
+export GATK_LOCAL_JAR=$GATK_HOME/gatk-4.1.0.0/libs/gatk.jar
+export GATK_SPARK_JAR=$GATK_HOME/gatk-4.1.0.0/libs/gatk-spark.jar
+export LD_LIBRARY_PATH=$GATK_HOME/gatk-4.1.0.0/libs:$LD_LIBRARY_PATH
+
+workPath=$BMK_HOME/work_dir
+ref=$BMK_HOME/Ref/Homo_sapiens_assembly38.fasta
+ref_dir=$BMK_HOME/Ref
+
+if [ -d "$workPath" ]; then
+   echo "workPath already created"
+else
+   mkdir -p $workPath
+fi
+knownSites=($ref_dir/Homo_sapiens_assembly38.dbsnp138.sort.vcf
+           $ref_dir/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz
+           $ref_dir/Homo_sapiens_assembly38.known_indels.vcf.gz)
 
 cd $workPath
 

@@ -3,9 +3,9 @@
 # Power9 tests - WGS pipeline
 ################################
 export PATH=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/bin:$PATH
-export GATK_LOCAL_JAR=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.0.11.0/libs/gatk.jar
-export GATK_SPARK_JAR=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.0.11.0/libs/gatk-spark.jar
-export LD_LIBRARY_PATH=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.0.11.0/libs:$LD_LIBRARY_PATH
+export GATK_LOCAL_JAR=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.1.0.0/libs/gatk.jar
+export GATK_SPARK_JAR=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.1.0.0/libs/gatk-spark.jar
+export LD_LIBRARY_PATH=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.1.0.0/libs:$LD_LIBRARY_PATH
 
 workPath=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/NA12878/tmp
 vcfFile=${workPath}/NA12878_merged.vcf
@@ -87,7 +87,7 @@ outfile=$workPath/NA12878_hg38.br.recal_$i.g.vcf
 if [ $i -lt 5 ]
 then
 /usr/bin/time -v -o time_gatkHaplotypeCaller_$i.log taskset -c $chr-$chr2 gatk \
-      --java-options "-Xmx4G -Djava.library.path=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.0.11.0/libs" HaplotypeCaller \
+      --java-options "-Xmx4G -Djava.library.path=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.1.0.0/libs" HaplotypeCaller \
       -R ${ref} -I $infile -L chr$i \
       --native-pair-hmm-threads 16 --smith-waterman FASTEST_AVAILABLE \
       -O $outfile -ERC GVCF -stand-call-conf 10 &
@@ -101,7 +101,7 @@ then
    fi
 else
 /usr/bin/time -v -o time_gatkHaplotypeCaller_$i.log taskset -c $chr-$chr2 gatk \
-      --java-options "-Xmx4G -Djava.library.path=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.0.11.0/libs" HaplotypeCaller \
+      --java-options "-Xmx4G -Djava.library.path=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.1.0.0/libs" HaplotypeCaller \
       -R ${ref} -I $infile -L chr$i \
       --native-pair-hmm-threads 4 --smith-waterman FASTEST_AVAILABLE \
       -O $outfile -ERC GVCF -stand-call-conf 10 &
@@ -113,7 +113,7 @@ for i in X Y M
 do
 outfile=$workPath/NA12878_hg38.br.recal_$i.g.vcf
 /usr/bin/time -v -o time_gatkHaplotypeCaller_$i.log taskset -c $chr-$chr2 gatk \
-      --java-options "-Xmx4G -Djava.library.path=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.0.11.0/libs" HaplotypeCaller \
+      --java-options "-Xmx4G -Djava.library.path=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG/gatk-4.1.0.0/libs" HaplotypeCaller \
       -R ${ref} -I $infile -L chr$i \
       --native-pair-hmm-threads 4 --smith-waterman FASTEST_AVAILABLE \
       -O $outfile -ERC GVCF -stand-call-conf 10 &
