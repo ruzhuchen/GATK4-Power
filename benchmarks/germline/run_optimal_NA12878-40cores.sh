@@ -6,8 +6,8 @@
 
 #Change this path for your test
 export GATK_HOME=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG
-export BMK_HOME=`pwd`
-export RF_HOME=`pwd`/Ref
+export BMK_HOME=
+export REF_HOME=
 
 export PATH=$GATK_HOME/bin:$PATH
 export GATK_LOCAL_JAR=$GATK_HOME/gatk-4.1.0.0/libs/gatk.jar
@@ -15,8 +15,8 @@ export GATK_SPARK_JAR=$GATK_HOME/gatk-4.1.0.0/libs/gatk-spark.jar
 export LD_LIBRARY_PATH=$GATK_HOME/gatk-4.1.0.0/libs:$LD_LIBRARY_PATH
 
 workPath=$BMK_HOME/work_dir
-ref=$BMK_HOME/Ref/Homo_sapiens_assembly38.fasta
-ref_dir=$BMK_HOME/Ref
+ref=$REF_HOME/Homo_sapiens_assembly38.fasta
+ref_dir=$REF_HOME
 
 if [ -d "$workPath" ]; then
    echo "workPath already created"
@@ -38,8 +38,8 @@ vcfDbsnp=$ref_dir/dbsnp_138.hg38.vcf.gz
 cd $workPath
 # BWA MEM MAPPING and SAMTOOLS SORTING ############
 
-input1=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/NA12878/input/NA12878_R1.fastq.gz
-input2=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/NA12878/input/NA12878_R2.fastq.gz
+input1=./input/NA12878_1.fastq.gz
+input2=./input/NA12878_2.fastq.gz
 output=$workPath/NA12878_hg38.bwa.bam
 
 /usr/bin/time -v -o time_bwa.log taskset -c 0-159:4 bwa mem -t 40 -Ma \
@@ -61,30 +61,42 @@ rm -fr fixmate.bam sorted.bam
 samtools index -@ 40 $output
 
 # BASE QUALITY SCORE RECALIBRATION ##########
+#Setup knownSites
+for i in ${!knownSites[*]}
+  do
+    if [ $i == 0 ]
+    then
+      knownSiteArg="--known-sites ${knownSites[i]}"
+    else
+      knownSiteArg="${knownSiteArg} --known-sites ${knownSites[i]}"
+    fi
+done
+
 input=$workPath/NA12878_hg38.md.bam
-output=$workPath/NA12878_hg38.md.bam.br.table
 chr=0
 chr2=3
-for i in `seq 1 22` X Y M
+for i in `seq -f '%04g' 0 39`
 do
 outfile=$workPath/NA12878_hg38.md.bam.br_$i.table
-/usr/bin/time -v -o time_gatkBaseRecalibrator_$i.log taskset -c $chr-$chr2 gatk --java-options "-Xmx4G -XX:+UseParallelGC -XX:ParallelGCThreads=20" BaseRecalibrator \
-         -L chr$i -R $ref -I $input \
-         --known-sites $knownSite -O $outfile &
+/usr/bin/time -v -o time_gatkBaseRecalibrator.log taskset -c $chr-$chr2 gatk \
+         --java-options "-Xmx4G -XX:+UseParallelGC -XX:ParallelGCThreads=20" BaseRecalibrator \
+         -L $GATK_HOME/benchmarks/intervals/40c/$i-scattered.interval_list \
+         -R $ref -I $input $knownSiteArg -O $outfile &
     chr=$(($chr+4))
     chr2=$(($chr2+4))
 done
 wait
+
 ## ApplyBQSR (note replacing PrintReads of GATK3)
 chr=0
 chr2=3
-for i in `seq 1 22` X Y M
+for i in `seq -f '%04g' 0 39`
 do
 bqfile=$workPath/NA12878_hg38.md.bam.br_$i.table
 output=$workPath/NA12878_hg38.br.recal_$i.bam
 /usr/bin/time -v -o time_gatkApplyBQSR_$i.log taskset -c $chr-$chr2 gatk \
        --java-options "-Xmx4G -Xmx4G -XX:+UseParallelGC -XX:ParallelGCThreads=4" ApplyBQSR -R $ref -I $input \
-       -L chr$i -bqsr $bqfile \
+       -L $GATK_HOME/benchmarks/intervals/40c/$i-scattered.interval_list  -bqsr $bqfile \
        --static-quantized-quals 10 --static-quantized-quals 20 --static-quantized-quals 30 -O $output &
     chr=$(($chr+4))
     chr2=$(($chr2+4))
@@ -94,47 +106,19 @@ wait
 # VARIANT CALLING optimized for 36 cores Power9 ##########
 # Used Onle native pairhmm  # Run Haplotypecaller with split bam file
 chr=0
-chr2=15
-for i in `seq 1 22`
+chr2=3
+for i in `seq -f '%04g' 0 39`
 do
 infile=$workPath/NA12878_hg38.br.recal_$i.bam
 outfile=$workPath/NA12878_hg38.br.recal_$i.g.vcf
-if [ $i -lt 6 ]
-then
-/usr/bin/time -v -o time_gatkHaplotypeCaller_$i.log taskset -c $chr-$chr2 gatk \
+/usr/bin/time -v -o time_gatkHaplotypeCaller.log taskset -c $chr-$chr2 gatk \
       --java-options "-Xmx4G -Djava.library.path=$GATK_HOME/gatk-4.1.0.0/libs" HaplotypeCaller \
-      -R ${ref} -I $infile -L chr$i \
-      --native-pair-hmm-threads 16 --smith-waterman FASTEST_AVAILABLE \
-      -O $outfile -ERC GVCF -stand-call-conf 10 &
-   if [ $i -lt 5 ]
-   then
-      chr=$(($chr+16))
-      chr2=$(($chr2+16))
-   else
-      chr=$(($chr+16))
-      chr2=$(($chr2+4))
-   fi
-else
-/usr/bin/time -v -o time_gatkHaplotypeCaller_$i.log taskset -c $chr-$chr2 gatk \
-      --java-options "-Xmx4G -Djava.library.path=$GATK_HOME/gatk-4.1.0.0/libs" HaplotypeCaller \
-      -R ${ref} -I $infile -L chr$i \
+      -R ${ref} -I $infile \
+      -L $GATK_HOME/benchmarks/intervals/40c/$i-scattered.interval_list \
       --native-pair-hmm-threads 4 --smith-waterman FASTEST_AVAILABLE \
       -O $outfile -ERC GVCF -stand-call-conf 10 &
    chr=$(($chr+4))
    chr2=$(($chr2+4))
-fi
-done
-for i in X Y M
-do
-infile=$workPath/NA12878_hg38.br.recal_$i.bam
-outfile=$workPath/NA12878_hg38.br.recal_$i.g.vcf
-/usr/bin/time -v -o time_gatkHaplotypeCaller_$i.log taskset -c $chr-$chr2 gatk \
-      --java-options "-Xmx4G -Djava.library.path=$GATK_HOME/gatk-4.1.0.0/libs" HaplotypeCaller \
-      -R ${ref} -I $infile -L chr$i \
-      --native-pair-hmm-threads 4 --smith-waterman FASTEST_AVAILABLE \
-      -O $outfile -ERC GVCF -stand-call-conf 10 &
-    chr=$(($chr+4))
-    chr2=$(($chr2+4))
 done
 wait
 

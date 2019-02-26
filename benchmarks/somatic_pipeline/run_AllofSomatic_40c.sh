@@ -29,9 +29,8 @@ knownSites=($ref_dir/Homo_sapiens_assembly38.dbsnp138.sort.vcf
 
 cd $workPath
 echo "Start pipeline at $(date)"
-
 # BWA MEM MAPPING and SAMTOOLS SORTING ############
-# The two inputs YX160000128N/T were combined 
+# The two inputs YX160000128N/T 
 input1=$workPath/../input/YX160000128T_1.fq.gz
 input2=$workPath/../input/YX160000128T_2.fq.gz
 input3=$workPath/../input/YX160000128N_1.fq.gz
@@ -39,39 +38,40 @@ input4=$workPath/../input/YX160000128N_2.fq.gz
 output1=$workPath/YX160000128T.bwa.bam
 output2=$workPath/YX160000128N.bwa.bam
 
-/usr/bin/time -v -o time_bwa_T.log taskset -c 0-159:4 bwa mem -t 40 -Ma \
-     -R '@RG\tID:YX160000128T_lane\tSM:YX160000128T\tPL:illumina\tLB:YX160000128T\tPU:lane' \
+/usr/bin/time -v -o time_bwaT.log taskset -c 0-159:4 bwa mem -K 1000000000 -v 3 -t 40 -Y \
      $ref $input1 $input2 \
-     | samtools view -bS - -@ 20 | samtools sort - -@ 20 -n -m 16G -T YX160000128T -o $output1
+     -R '@RG\tID:YX160000128T_lane\tSM:YX160000128T\tPL:illumina\tLB:YX160000128T\tPU:lane' \
+     | samtools view -1 - -@ 20 | samtools sort - -@ 20 -m 8G -T YX160000128T -o $output1
 
-/usr/bin/time -v -o time_bwa_N.log taskset -c 0-159:4 bwa mem -t 40 -Ma \
-     -R '@RG\tID:YX160000128N_lane\tSM:YX160000128N\tPL:illumina\tLB:YX160000128N\tPU:lane' \
+/usr/bin/time -v -o time_bwaN.log taskset -c 0-159:4 bwa mem -K 1000000000 -v 3 -t 40 -Y \
      $ref $input3 $input4 \
-     | samtools view -bS - -@ 20 | samtools sort - -@ 20 -n -m 16G -T YX160000128N -o $output2
-# Markduplicates ############
+     -R '@RG\tID:YX160000128N_lane\tSM:YX160000128N\tPL:illumina\tLB:YX160000128N\tPU:lane' \
+     | samtools view -1 - -@ 20 | samtools sort - -@ 20 -m 8G -T YX160000128N -o $output2
 
 input1=$workPath/YX160000128T.bwa.bam
 input2=$workPath/YX160000128N.bwa.bam
-output1=$workPath/YX160000128T.md.bam
-output2=$workPath/YX160000128N.md.bam
+output1=$workPath/YX160000128T.hg38.md.bam
+output2=$workPath/YX160000128N.hg38.md.bam
 
-/usr/bin/time -v -o time_Fixmate_mk1.log taskset -c 0-159:4 samtools fixmate -m -@ 40 $input1 fixmate1.bam
-/usr/bin/time -v -o time_Fixmate_mk2.log taskset -c 0-159:4 samtools fixmate -m -@ 40 $input2 fixmate2.bam
-/usr/bin/time -v -o time_Sort_mk1.log samtools sort -@ 40 -o sorted1.bam fixmate1.bam
-/usr/bin/time -v -o time_Sort_mk2.log samtools sort -@ 40 -o sorted2.bam fixmate2.bam
-/usr/bin/time -v -o time_Markduplicates1.log taskset -c 0-159:4 samtools markdup -s -@ 40 sorted1.bam $output1
-/usr/bin/time -v -o time_Markduplicates2.log taskset -c 0-159:4 samtools markdup -s -@ 40 sorted2.bam $output2
+/usr/bin/time -v -o time_markDup_T.log gatk --java-options "-Xmx20G -XX:+UseParallelGC -XX:ParallelGCThreads=4" MarkDuplicates \
+      -I $input1 -O $output1 \
+      -M $workPath/YX160000128T_bwa_metrics.txt --MAX_RECORDS_IN_RAM 5000000 -MAX_SEQS 5000000 \
+      --OPTICAL_DUPLICATE_PIXEL_DISTANCE 2500 --VALIDATION_STRINGENCY SILENT -MAX_FILE_HANDLES 1000 &
 
-rm -f fixmate*.bam sorted*.bam
+/usr/bin/time -v -o time_markDup_N.log gatk --java-options "-Xmx20G -XX:+UseParallelGC -XX:ParallelGCThreads=4" MarkDuplicates \
+      -I $input2 -O $output2 \
+      -M $workPath/YX160000128N_bwa_metrics.txt --MAX_RECORDS_IN_RAM 5000000 -MAX_SEQS 5000000 \
+      --OPTICAL_DUPLICATE_PIXEL_DISTANCE 2500 --VALIDATION_STRINGENCY SILENT -MAX_FILE_HANDLES 1000 &
+wait
 
 #create index
-samtools index -@ 40 $output1
-samtools index -@ 40 $output2
+samtools index -@ 20 $output1
+samtools index -@ 20 $output2
 
 # BASE QUALITY SCORE RECALIBRATION ##########
 	
-input1=$workPath/YX160000128T.md.bam
-input2=$workPath/YX160000128N.md.bam
+input1=$workPath/YX160000128T.hg38.md.bam
+input2=$workPath/YX160000128N.hg38.md.bam
 
 #Setup knownSites
 for i in ${!knownSites[*]}
@@ -123,6 +123,7 @@ samtools index -@ 40 $output2
 # 1. Call somatic short variants and generate a bamout
 Tumor_input=$workPath/YX160000128T_hg38.br.recal.bam
 Normal_input=$workPath/YX160000128N_hg38.br.recal.bam
+
 chr=0
 chr2=3
 for i in `seq -f '%04g' 0 39`
@@ -135,7 +136,7 @@ M2_output=$workPath/YX160000128_m2_$i.vcf.gz
        --native-pair-hmm-threads 4 \
        -pon $ref_dir/somatic/M2PoN_4.0_WGS_for_public.vcf \
        --germline-resource $ref_dir/somatic/af-only-gnomad.hg38.vcf.gz \
-       -L $GATK_HOME/benchmarks/intervals/40c/$i-scattered.interval_list \
+       -L $workPath/../intervals/40c/$i-scattered.interval_list \
        -O $M2_output &
    chr=$(($chr+4))
    chr2=$(($chr2+4))
@@ -144,7 +145,7 @@ wait
 
 # Merge VCF files
 vFiles=()
-for i in YX160000128_somatic_m2_*.vcf.gz
+for i in YX160000128_m2_*.vcf.gz
 do
    vFiles[${#vFiles[*]}]=$i
 done
@@ -160,37 +161,35 @@ done
 
 /usr/bin/time -v -o time_gatkMergeVCF-m2.log gatk --java-options "-Xmx4g" MergeVcfs \
       $vFilesArg -R $ref \
-      -O YX160000128_somatic_unfiltered.vcf.gz
+      -O YX160000128_hg38-unfiltered.vcf.gz
 
-rm -f YX160000128_somatic_m2_*.vcf.gz*
+rm -f YX160000128_m2_*.vcf.gz*
 
 # 2. Estimate cross-sample contamination using GetPileupSummaries and CalculateContamination
 /usr/bin/time -v -o time_gatkGetPileupSummaries.log gatk --java-options "-Xmx4g" GetPileupSummaries \
       -I $workPath/YX160000128T_hg38.br.recal.bam \
       -V $ref_dir/somatic/small_exac_common_3.hg38.vcf.gz \
       -L $ref_dir/wgs_calling_regions.hg38.interval_list \
-      -O YX160000128T_getpileupsummaries.table
+      -O YX160000128T_getpileupsummaries.table 
 
 /usr/bin/time -v -o time_gatkCalculateContamination.log gatk --java-options "-Xmx4g" CalculateContamination \
       -I YX160000128T_getpileupsummaries.table \
       -O YX160000128T_calculatecontamination.table
 
-# 3. Filter for confident somatic calls using FilterMutectCalls
+# 4. Filter for confident somatic calls using FilterMutectCalls
 /usr/bin/time -v -o time_gatkFilterMutectCalls.log gatk --java-options "-Xmx4g" FilterMutectCalls \
-      -V YX160000128_somatic_unfiltered.vcf.gz \
+      -V YX160000128_hg38-unfiltered.vcf.gz \
       --contamination-table YX160000128T_calculatecontamination.table \
-      -O YX160000128_somatic_filtered.vcf.gz
+      -O YX160000128_hg38_filtered.vcf.gz
 
 ##### OPTINAL STEPS #####
-# 4. Estimate artifacts with CollectSequencingArtifactMetrics and filter them with FilterByOrientationBias
+# 5. (Optional) Estimate artifacts with CollectSequencingArtifactMetrics and filter them with FilterByOrientationBias
 /usr/bin/time -v -o time_gatkCollectSequencingArtifactMetrics.log gatk --java-options "-Xmx4g" CollectSequencingArtifactMetrics \
       -R $ref -I $workPath/YX160000128T_hg38.br.recal.bam \
       -O YX160000128_tumor_artifact
 
 /usr/bin/time -v -o time_gatkFilterByOrientationBias.log gatk --java-options "-Xmx4g" FilterByOrientationBias \
       -AM 'G/T' -AM 'C/T' \
-      -V YX160000128_somatic_filtered.vcf.gz \
+      -V YX160000128_hg38_filtered.vcf.gz \
       -P YX160000128_tumor_artifact.pre_adapter_detail_metrics \
       -O YX160000128_somatic_twicefiltered.vcf.gz
-
-echo "Finish pipeline at $(date)"
