@@ -6,15 +6,15 @@
 
 #Change this path for your test
 export GATK_HOME=/gpfs/gpfs_4mb/rchen/Power9/GATK4/P9_PKG
-export BMK_HOME=###
-export REF_HOME=###
+export BMK_HOME=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/NA12878
+export REF_HOME=/gpfs/gpfs_4mb/rchen/Power9/GATK4/benchmarks/Ref
 
 export PATH=$GATK_HOME/bin:$PATH
 export GATK_LOCAL_JAR=$GATK_HOME/gatk-4.1.0.0/libs/gatk.jar
 export GATK_SPARK_JAR=$GATK_HOME/gatk-4.1.0.0/libs/gatk-spark.jar
 export LD_LIBRARY_PATH=$GATK_HOME/gatk-4.1.0.0/libs:$LD_LIBRARY_PATH
 
-workPath=$BMK_HOME/work_dir
+workPath=$BMK_HOME/work$$
 ref=$REF_HOME/Homo_sapiens_assembly38.fasta
 ref_dir=$REF_HOME
 
@@ -42,9 +42,9 @@ input1=$BMK_HOME/input/NA12878_1.fastq.gz
 input2=$BMK_HOME/input/NA12878_2.fastq.gz
 output=$workPath/NA12878_hg38.bwa.bam
 
-/usr/bin/time -v -o time_bwa.log taskset -c 0-143:4 bwa mem -t 36 -Ma \
+/usr/bin/time -v -o time_bwa_jemalloc.log taskset -c 0-143 /gpfs/gpfs_4mb/rchen/Power9/BWA/bwa-0.7.17/bwa mem -t 144 -Ma \
      -R '@RG\tID:sample_lane\tSM:sample\tPL:illumina\tLB:sample\tPU:lane' \
-     $ref $input1 $input2 | samtools view -bS - -@ 18 | samtools sort - -@ 18 -n -m 8G -T $input1 -o $output
+     $ref $input1 $input2 | samtools view -bS - -@ 18 | samtools sort - -@ 36 -n -m 4G -T $input1 -o $output
 
 # Markduplicates using Samtools ############
 #running mark duplicates with samtools
@@ -84,7 +84,7 @@ done
 bqfile=$workPath/NA12878_hg38.md.bam.br.table
 output=$workPath/NA12878_hg38.br.recal.bam
 /usr/bin/time -v -o time_gatkApplyBQSR.log taskset -c 0-143:4 gatk \
-       --java-options "-Xmx8G -XX:+UseParallelGC -XX:ParallelGCThreads=4" ApplyBQSRSpark -R $ref -I $input1 \
+       --java-options "-Xmx8G -XX:+UseParallelGC -XX:ParallelGCThreads=4" ApplyBQSRSpark -R $ref -I $input \
        -bqsr $bqfile \
        --static-quantized-quals 10 --static-quantized-quals 20 --static-quantized-quals 30 -O $output \
        -- --spark-runner LOCAL --spark-master local[36] --conf spark.local.dir=$workPath
@@ -131,17 +131,17 @@ done
 # genotype gvcf files
 input=${vcfFile%vcf}g.vcf
 /usr/bin/time -v -o time_gatkGenotypeGVCFs.log gatk --java-options "-Xmx4G" GenotypeGVCFs -R $ref -V $input -O $vcfFile
- 
+
 # VARIANT QUALITY SCORE RECALIBRATION (VQSR) ########
 /usr/bin/time -v -o time_gatkVariantRecalibratorSNP.log gatk --java-options "-Xmx4G" VariantRecalibrator \
      -V $vcfFile -O ${workPath}/NA12878_recalibrate_SNP.recal \
      -mode SNP --tranches-file ${workPath}/NA12878_recalibrate_SNP.tranches \
      -tranche 100.0 -tranche 99.9 -tranche 99.0 -tranche 90.0 -an QD -an FS -an MQRankSum -an ReadPosRankSum -an SOR -an MQ \
      --max-gaussians 6 \
-     -resource hapmap,known=false,training=true,truth=true,prior=15.0:$vcfHapmap \
-     -resource omni,known=false,training=true,truth=true,prior=12.0:$vcfOmni \
-     -resource 1000G,known=false,training=true,truth=false,prior=10.0:$vcfGlk \
-     -resource dbsnp,known=true,training=false,truth=false,prior=7.0:$vcfDbsnp
+     -resource:hapmap,known=false,training=true,truth=true,prior=15.0 $vcfHapmap \
+     -resource:omni,known=false,training=true,truth=true,prior=12.0 $vcfOmni \
+     -resource:1000G,known=false,training=true,truth=false,prior=10.0 $vcfGlk \
+     -resource:dbsnp,known=true,training=false,truth=false,prior=7.0 $vcfDbsnp
   
   # Apply recalibration to SNPs
 /usr/bin/time -v -o time_gatkApplyVQSRSNP.log gatk --java-options "-Xmx4G" ApplyVQSR \
@@ -156,8 +156,8 @@ input=${vcfFile%vcf}g.vcf
      -mode INDEL --tranches-file ${workPath}/NA12878_recalibrate_INDEL.tranches \
      -tranche 100.0 -tranche 99.9 -tranche 99.0 -tranche 90.0 -an QD -an FS -an MQRankSum -an ReadPosRankSum -an SOR \
      --max-gaussians 4 \
-     -resource mills,known=false,training=true,truth=true,prior=12.0:$vcfMills \
-     -resource dbsnp,known=true,training=false,truth=false,prior=2.0:$vcfDbsnp \
+     -resource:mills,known=false,training=true,truth=true,prior=12.0 $vcfMills \
+     -resource:dbsnp,known=true,training=false,truth=false,prior=2.0 $vcfDbsnp \
        
    # Apply recalibration to INDELs  
 /usr/bin/time -v -o time_gatkApplyVQSRIndel.log gatk --java-options "-Xmx4G" ApplyVQSR \

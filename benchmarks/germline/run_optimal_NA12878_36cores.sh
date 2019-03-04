@@ -42,9 +42,9 @@ input1=./input/NA12878_1.fastq.gz
 input2=./input/NA12878_2.fastq.gz
 output=$workPath/NA12878_hg38.bwa.bam
 
-/usr/bin/time -v -o time_bwa.log taskset -c 0-143:4 bwa mem -t 36 -Ma \
+/usr/bin/time -v -o time_bwa.log taskset -c 0-143 bwa mem -t 144 -Ma \
      -R '@RG\tID:sample_lane\tSM:sample\tPL:illumina\tLB:sample\tPU:lane' \
-     $ref $input1 $input2 | samtools view -bS - -@ 18 | samtools sort - -@ 18 -n -m 8G -T $input1 -o $output
+     $ref $input1 $input2 | samtools view -bS - -@ 18 | samtools sort - -@ 36 -n -m 8G -T $input1 -o $output
 
 # Markduplicates using Samtools ############
 #running mark duplicates with samtools
@@ -53,7 +53,7 @@ input=$workPath/NA12878_hg38.bwa.bam
 output=$workPath/NA12878_hg38.md.bam
 
 /usr/bin/time -v -o time_Fixmate_mk.log taskset -c 0-143:4 samtools fixmate -m -@ 36 $input fixmate.bam
-/usr/bin/time -v -o time_Sort_mk.log samtools sort -@ 36 -m 8G -o sorted.bam fixmate.bam
+/usr/bin/time -v -o time_Sort_mk.log taskset -c 0-143:4 samtools sort -@ 36 -m 8G -o sorted.bam fixmate.bam
 /usr/bin/time -v -o time_Markduplicates.log taskset -c 0-143:4 samtools markdup -s -@ 36 sorted.bam $output
 
 rm -fr fixmate.bam sorted.bam
@@ -94,7 +94,7 @@ for i in `seq -f '%04g' 0 35`
 do
 bqfile=$workPath/NA12878_hg38.md.bam.br_$i.table
 output=$workPath/NA12878_hg38.br.recal_$i.bam
-/usr/bin/time -v -o time_gatkApplyBQSR_$i.log taskset -c $chr-$chr2 gatk \
+/usr/bin/time -v -o time_gatkApplyBQSR.log taskset -c $chr-$chr2 gatk \
        --java-options "-Xmx4G -Xmx4G -XX:+UseParallelGC -XX:ParallelGCThreads=4" ApplyBQSR -R $ref -I $input \
        -L $GATK_HOME/benchmarks/intervals/36c/$i-scattered.interval_list  -bqsr $bqfile \
        --static-quantized-quals 10 --static-quantized-quals 20 --static-quantized-quals 30 -O $output &
@@ -151,10 +151,10 @@ input=${vcfFile%vcf}g.vcf
      -mode SNP --tranches-file ${workPath}/NA12878_recalibrate_SNP.tranches \
      -tranche 100.0 -tranche 99.9 -tranche 99.0 -tranche 90.0 -an QD -an FS -an MQRankSum -an ReadPosRankSum -an SOR -an MQ \
      --max-gaussians 6 \
-     -resource hapmap,known=false,training=true,truth=true,prior=15.0:$vcfHapmap \
-     -resource omni,known=false,training=true,truth=true,prior=12.0:$vcfOmni \
-     -resource 1000G,known=false,training=true,truth=false,prior=10.0:$vcfGlk \
-     -resource dbsnp,known=true,training=false,truth=false,prior=7.0:$vcfDbsnp
+     -resource:hapmap,known=false,training=true,truth=true,prior=15.0 $vcfHapmap \
+     -resource:omni,known=false,training=true,truth=true,prior=12.0 $vcfOmni \
+     -resource:1000G,known=false,training=true,truth=false,prior=10.0 $vcfGlk \
+     -resource:dbsnp,known=true,training=false,truth=false,prior=7.0 $vcfDbsnp
   
   # Apply recalibration to SNPs
 /usr/bin/time -v -o time_gatkApplyVQSRSNP.log gatk --java-options "-Xmx4G" ApplyVQSR \
@@ -169,8 +169,8 @@ input=${vcfFile%vcf}g.vcf
      -mode INDEL --tranches-file ${workPath}/NA12878_recalibrate_INDEL.tranches \
      -tranche 100.0 -tranche 99.9 -tranche 99.0 -tranche 90.0 -an QD -an FS -an MQRankSum -an ReadPosRankSum -an SOR \
      --max-gaussians 4 \
-     -resource mills,known=false,training=true,truth=true,prior=12.0:$vcfMills \
-     -resource dbsnp,known=true,training=false,truth=false,prior=2.0:$vcfDbsnp \
+     -resource:mills,known=false,training=true,truth=true,prior=12.0 $vcfMills \
+     -resource:dbsnp,known=true,training=false,truth=false,prior=2.0 $vcfDbsnp \
        
    # Apply recalibration to INDELs  
 /usr/bin/time -v -o time_gatkApplyVQSRIndel.log gatk --java-options "-Xmx4G" ApplyVQSR \
