@@ -92,20 +92,16 @@ samtools index -@ 36 $output
 
 # VARIANT CALLING optimized for 36 cores Power9 ##########
 # Used Onle native pairhmm  # Run Haplotypecaller with split bam file
-chr=0
-chr2=3
 infile=$workPath/NA12878_hg38.br.recal.bam
 for i in `seq -f '%04g' 0 39`
 do
 outfile=$workPath/NA12878_hg38.br.recal_$i.g.vcf
-/usr/bin/time -v -o time_gatkHaplotypeCaller.log taskset -c $chr-$chr2 gatk \
+/usr/bin/time -v -o time_gatkHaplotypeCaller.log gatk \
       --java-options "-Xmx4G -Djava.library.path=$GATK_HOME/gatk-4.1.0.0/libs" HaplotypeCaller \
-      -R ${ref} -I $infile \
+      -R ${ref} -I $infile -pairHMM VSX_LOGLESS_CACHING \
       -L $GATK_HOME/benchmarks/intervals/36c/$i-scattered.interval_list \
       --native-pair-hmm-threads 4 --smith-waterman FASTEST_AVAILABLE \
       -O $outfile -ERC GVCF -stand-call-conf 10 &
-   chr=$(($chr+4))
-   chr2=$(($chr2+4))
 done
 wait
 
