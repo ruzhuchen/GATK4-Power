@@ -7,8 +7,18 @@ Supporting GATK4 on IBM Power architecture, including enablement, performance tu
   See other branches
 ## This includes:
 * GATK4 package built on IBM Pwer9 
-  GATK4 on Power9 binaries and JAR files is available upon request.
+  GATK4 on Power9 full package (downloadable) is available upon request.
 * Benchmarking scripts to run GATK4 pipelines on IBM Power system
+## Install GATK4 on Power9
+* Clone GATK4-Power
+ ```git clone ```
+* Run installation script to complete the installation
+ ```./install_gatk4-power9.x```
+* Generate runscript (Germline)
+ ```./run_gatk-power.x```
+## Create docker image
+* Run docker script and upload to your system
+ ``` docker run -t gatk:4.1.0.0 ``` 
 
 Contact: Ruzhu Chen (ruzhuchen@us.ibm.com) for support
 
