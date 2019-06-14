@@ -1,8 +1,8 @@
-[![GATK v4.1.0.0](https://img.shields.io/badge/gatk%20source-4.1.0.0-green.svg)](https://github.com/broadinstitute/gatk/archive/4.1.0.0.tar.gz)[![License (3-Clause BSD)](https://img.shields.io/badge/license-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)[![IBM Power9 Download](https://img.shields.io/badge/power9-download-blue.svg)](https://ibm.box.com/v/gatk-power4100)
+[![GATK v4.1.2.0](https://img.shields.io/badge/gatk%20source-4.1.2.0-green.svg)](https://github.com/broadinstitute/gatk/archive/4.1.2.0.tar.gz)[![License (3-Clause BSD)](https://img.shields.io/badge/license-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)[![IBM Power9 Download](https://img.shields.io/badge/power9-download-blue.svg)](https://ibm.box.com/v/gatk-power4120)
 # GATK4-Power 
 Supporting GATK4 on IBM Power architecture, including enablement, performance tuning and optimization.
 * Latest version 
-  v4.1.0 built on 02-25-2019
+  v4.1.2.0 built on 06-15-2019
 * Older version
   See other branches
 ## This includes:
@@ -18,7 +18,7 @@ Supporting GATK4 on IBM Power architecture, including enablement, performance tu
  ```./run_gatk-power.x```
 ## Create docker image
 * Run docker script and upload to your system
- ``` docker run -t gatk:4.1.0.0 ``` 
+ ``` docker run -t gatk:4.1.2.0 ``` 
 
 Contact: Ruzhu Chen (ruzhuchen@us.ibm.com) for support
 

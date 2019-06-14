@@ -1,10 +1,15 @@
-# GATK4 Version 4.1.0.0 on Power9 with Native PairHMM
+# GATK4 Version 4.1.2.0 on Power9 with Native PairHMM
+The pipeline executes from BWA MEM to ApplyVQSR (SNPs and Indels). 
+* BWA
+* Samtools
+* sam2bam (optional)
+The above tools available at `$GATK_HOME/bin` dir
 
 ## To use native PairHMM:
 
 add ```--native-pair-hmm-threads``` to HaplotypeCaller and Mutect2
 
-use ```--java-options "-Xmx4G -Djava.library.path=$GATK_HOME/gatk-4.1.0.0/libs" ``` to run HaplotypeCaller and Mutect2
+use ```--java-options "-Djava.library.path=$GATK_HOME/gatk-4.1.2.0/libs" ``` to run HaplotypeCaller and Mutect2
 
 ## This script is optimized for Power9 only. 
 * Please download reference files directly from Broad Institute's ftp

@@ -10,9 +10,9 @@ export BMK_HOME=`pwd`
 export RF_HOME=`pwd`/Ref
 
 export PATH=$GATK_HOME/bin:$PATH
-export GATK_LOCAL_JAR=$GATK_HOME/gatk-4.1.0.0/libs/gatk.jar
-export GATK_SPARK_JAR=$GATK_HOME/gatk-4.1.0.0/libs/gatk-spark.jar
-export LD_LIBRARY_PATH=$GATK_HOME/gatk-4.1.0.0/libs:$LD_LIBRARY_PATH
+export GATK_LOCAL_JAR=$GATK_HOME/gatk-4.1.2.0/libs/gatk.jar
+export GATK_SPARK_JAR=$GATK_HOME/gatk-4.1.2.0/libs/gatk-spark.jar
+export LD_LIBRARY_PATH=$GATK_HOME/gatk-4.1.2.0/libs:$LD_LIBRARY_PATH
 
 workPath=$BMK_HOME/intervals
 ref=$BMK_HOME/Ref/Homo_sapiens_assembly38.fasta

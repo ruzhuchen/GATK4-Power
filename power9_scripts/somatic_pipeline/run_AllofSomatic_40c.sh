@@ -10,9 +10,9 @@ export BMK_HOME=
 export REF_HOME=
 
 export PATH=$GATK_HOME/bin:$PATH
-export GATK_LOCAL_JAR=$GATK_HOME/gatk-4.1.0.0/libs/gatk.jar
-export GATK_SPARK_JAR=$GATK_HOME/gatk-4.1.0.0/libs/gatk-spark.jar
-export LD_LIBRARY_PATH=$GATK_HOME/gatk-4.1.0.0/libs:$LD_LIBRARY_PATH
+export GATK_LOCAL_JAR=$GATK_HOME/gatk-4.1.2.0/libs/gatk.jar
+export GATK_SPARK_JAR=$GATK_HOME/gatk-4.1.2.0/libs/gatk-spark.jar
+export LD_LIBRARY_PATH=$GATK_HOME/gatk-4.1.2.0/libs:$LD_LIBRARY_PATH
 
 workPath=$BMK_HOME/work_dir
 ref=$REF_HOME/Homo_sapiens_assembly38.fasta
@@ -130,7 +130,7 @@ for i in `seq -f '%04g' 0 39`
 do
 M2_output=$workPath/YX160000128_m2_$i.vcf.gz
 /usr/bin/time -v -o time_gatkMutect2_m2.log taskset -c $chr-$chr2 gatk \
-       --java-options "-Xmx4g -Djava.library.path=$GATK_HOME/gatk-4.1.0.0/libs" Mutect2 \
+       --java-options "-Xmx4g -Djava.library.path=$GATK_HOME/gatk-4.1.2.0/libs" Mutect2 \
        -R $ref -I $Tumor_input -tumor YX160000128T \
        -I $Normal_input -normal YX160000128N \
        --native-pair-hmm-threads 4 \
