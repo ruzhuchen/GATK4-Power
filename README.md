@@ -19,8 +19,8 @@ Supporting GATK4 on IBM Power architecture, including enablement, performance tu
 ## Create docker image
 * Run docker script and upload to your system
  ``` docker run -t gatk:4.1.2.0 ``` 
-## Performance
-<img src="https://github.com/ruzhuchen/NGS/blob/master/images/p9_performance.png" alt="GATK4 performance on Power9" title="GATK4 performance on Power9" width="949px">
+## GATK4 Performance on Power9
+<img src="https://github.com/ruzhuchen/NGS/blob/master/images/p9_performance.png" alt="GATK4 performance on Power9" title="GATK4 performance on Power9" width="50%" height="50%">
 
 Contact: Ruzhu Chen (ruzhuchen@us.ibm.com) for support
 
