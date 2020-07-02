@@ -21,14 +21,14 @@ ENV export JAVA_HOME /usr/lib/jvm/java-8-openjdk-ppc64el
 ENV JAVA_LIBRARY_PATH /usr/lib/powerpc64le-linux-gnu/jni
 CMD ["bash"]
 RUN mkdir -p /apps/bin
-RUN mkdir -p /work
+RUN mkdir -p /gatk
 RUN mkdir -p /data
-WORKDIR  /work
-ADD gatk-4.1.4.1 /apps/gatk-4.1.4.1
+WORKDIR  /gatk
+ADD gatk-4.1.8.0 /apps/gatk-4.1.8.0
 COPY bin /apps/bin
 ADD benchmarks /apps/benchmarks
 ENV GATK_HOME /apps
 ENV PATH $GATK_HOME/bin:$PATH
-ENV GATK_LOCAL_JAR $GATK_HOME/gatk-4.1.4.1/libs/gatk.jar
-ENV GATK_SPARK_JAR $GATK_HOME/gatk-4.1.4.1/libs/gatk-spark.jar
-ENV LD_LIBRARY_PATH $GATK_HOME/gatk-4.1.4.1/libs:$LD_LIBRARY_PATH
+ENV GATK_LOCAL_JAR $GATK_HOME/gatk-4.1.8.0/libs/gatk-local.jar
+ENV GATK_SPARK_JAR $GATK_HOME/gatk-4.1.8.0/libs/gatk-spark.jar
+ENV LD_LIBRARY_PATH $GATK_HOME/gatk-4.1.8.0/libs:$LD_LIBRARY_PATH
